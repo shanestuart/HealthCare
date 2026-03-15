@@ -1,13 +1,13 @@
 import streamlit as st
-import pickle
+import joblib
 import pandas as pd
 from gtts import gTTS
 import tempfile
 from transformers import pipeline
 
-# ---------------------------------------------------
+# -----------------------------------
 # Page Configuration
-# ---------------------------------------------------
+# -----------------------------------
 
 st.set_page_config(
     page_title="AI Healthcare Assistant",
@@ -15,25 +15,25 @@ st.set_page_config(
     layout="centered"
 )
 
-# ---------------------------------------------------
-# Load Resources (Cached for Performance)
-# ---------------------------------------------------
+# -----------------------------------
+# Load Saved Resources
+# -----------------------------------
 
 @st.cache_resource
 def load_model():
-    return pickle.load(open("disease_prediction_model.pkl", "rb"))
+    return joblib.load("disease_prediction_model.pkl")
 
 @st.cache_resource
 def load_symptoms():
-    return pickle.load(open("symptom_columns.pkl", "rb"))
+    return joblib.load("symptom_columns.pkl")
 
 @st.cache_resource
 def load_precautions():
-    return pickle.load(open("precautions.pkl", "rb"))
+    return joblib.load("precautions.pkl")
 
 @st.cache_resource
 def load_ai_model():
-    return pipeline("text-generation", model="gpt2")
+    return pipeline("text-generation", model="distilgpt2")
 
 
 model = load_model()
@@ -41,9 +41,9 @@ symptom_columns = load_symptoms()
 precautions_df = load_precautions()
 ai_model = load_ai_model()
 
-# ---------------------------------------------------
+# -----------------------------------
 # Helper Functions
-# ---------------------------------------------------
+# -----------------------------------
 
 def predict_disease(user_symptoms):
 
@@ -69,73 +69,69 @@ def get_precautions(disease):
         return [p for p in precautions if str(p) != "nan"]
 
     except:
-        return ["Consult a doctor for proper medical advice."]
+        return ["Consult a doctor for medical advice."]
 
 
-def generate_ai_explanation(symptoms, disease):
+def ai_explanation(symptoms, disease):
 
     prompt = f"""
-A patient has the following symptoms: {symptoms}
+Symptoms: {symptoms}
 
-The predicted disease is: {disease}
+Possible disease: {disease}
 
-Explain this disease in simple terms and give basic health advice.
+Explain this condition and give basic health advice.
 """
 
-    try:
-        result = ai_model(prompt, max_length=120)
-        return result[0]["generated_text"]
+    result = ai_model(prompt, max_length=120)
 
-    except:
-        return "AI explanation currently unavailable."
+    return result[0]["generated_text"]
 
 
 def generate_voice(text):
 
     tts = gTTS(text=text)
 
-    temp_audio = tempfile.NamedTemporaryFile(delete=False)
+    temp_file = tempfile.NamedTemporaryFile(delete=False)
 
-    tts.save(temp_audio.name)
+    tts.save(temp_file.name)
 
-    return temp_audio.name
+    return temp_file.name
 
 
-# ---------------------------------------------------
+# -----------------------------------
 # UI Layout
-# ---------------------------------------------------
+# -----------------------------------
 
 st.title("🏥 AI Healthcare Assistant")
 
 st.markdown(
 """
-This AI system predicts **possible diseases from symptoms** and suggests **basic precautions**.
+Enter your symptoms and the AI will predict a possible condition and suggest precautions.
 
-⚠️ This tool is for **educational purposes only** and is **not a medical diagnosis system**.
+⚠️ This tool is for **educational purposes only** and should not replace professional medical advice.
 """
 )
 
 st.divider()
 
-# User Input
-symptom_input = st.text_input(
-    "Enter your symptoms (separated by spaces)",
+user_input = st.text_input(
+    "Enter symptoms separated by spaces",
     placeholder="Example: fever cough headache"
 )
 
 predict_button = st.button("Analyze Symptoms")
 
-# ---------------------------------------------------
+# -----------------------------------
 # Prediction Logic
-# ---------------------------------------------------
+# -----------------------------------
 
 if predict_button:
 
-    if symptom_input.strip() == "":
+    if user_input.strip() == "":
         st.warning("Please enter at least one symptom.")
     else:
 
-        symptoms = symptom_input.lower().split()
+        symptoms = user_input.lower().split()
 
         with st.spinner("Analyzing symptoms..."):
 
@@ -143,7 +139,7 @@ if predict_button:
 
             precautions = get_precautions(disease)
 
-            explanation = generate_ai_explanation(symptom_input, disease)
+            explanation = ai_explanation(user_input, disease)
 
         st.success("Analysis Complete")
 
@@ -160,7 +156,6 @@ if predict_button:
 
         st.write(explanation)
 
-        # Voice Response
         voice_text = f"""
 The predicted condition is {disease}.
 Recommended precautions are {', '.join(precautions)}.
@@ -174,4 +169,4 @@ Recommended precautions are {', '.join(precautions)}.
 
 st.divider()
 
-st.caption("AI Healthcare Assistant • Built with Streamlit")
+st.caption("AI Healthcare Assistant • Powered by AI")
